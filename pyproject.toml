@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "interrception"
+version = "0.1.0"
+description = "AI powered CLI error debugger"
+requires-python = ">=3.9"
+dependencies = [
+    "anthropic",
+    "python-dotenv"
+]
+
+[project.scripts]
+interrception = "interrception.main:run"
+
+[tool.setuptools]
+packages = ["interrception"]
