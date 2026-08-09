@@ -1,4 +1,5 @@
 from inventory import Warehouse
+from config import build_order
 
 def process_order(warehouse, order):
     for item, qty in order.items():
@@ -6,9 +7,5 @@ def process_order(warehouse, order):
         print(f"{item}: {remaining} left")
 
 def fulfill(warehouse):
-    pending_order = {"widgets": 3, "sprockets": 2}
+    pending_order = build_order()
     process_order(warehouse, pending_order)
-
-if __name__ == "__main__":
-    wh = Warehouse()
-    fulfill(wh)

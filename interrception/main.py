@@ -1,6 +1,5 @@
 import os
 import anthropic
-import subprocess
 from dotenv import load_dotenv
 
 load_dotenv()
