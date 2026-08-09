@@ -3,3 +3,5 @@
 venv/
 
 scratch/
+
+cli_debugger_agent.egg-info/
