@@ -1,7 +1,6 @@
-.env
-
+*.egg-info/
+__pycache__/
+*.pyc
 venv/
-
+.env
 scratch/
-
-cli_debugger_agent.egg-info/
