@@ -13,7 +13,7 @@ dependencies = [
 ]
 
 [project.scripts]
-interrception = "interrception.main:run"
+interrception = "interrception.cli:run"
 
 [tool.setuptools]
 packages = ["interrception"]
