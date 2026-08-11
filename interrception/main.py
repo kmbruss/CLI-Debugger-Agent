@@ -9,6 +9,7 @@ import subprocess
 import anthropic
 from dotenv import load_dotenv
 
+from interrception.context import FailureContext
 
 # ============================================================================
 # Configuration
@@ -18,7 +19,7 @@ ANTHROPIC_KEY = os.getenv("ANTHROPIC_API_KEY")
 if not ANTHROPIC_KEY:
     print("Missing ANTHROPIC_API_KEY")
     sys.exit(1)
-MAX_ATTEMPTS = 2
+MAX_ATTEMPTS = 5
 
 
 # ============================================================================
@@ -90,18 +91,18 @@ def get_command() -> list[str]:
     return shlex.split(previous_command)
 
 
-def validate_command(command: list[str]) -> None:
-    """Validate command target file exists if applicable."""
-    target = command[-1]
-    if ("." in target or "/" in target) and not os.path.isfile(target):
-        print(f"\n  File not found: {target}\n")
-        sys.exit(1)
+# def validate_command(command: list[str]) -> None:
+#     """Validate command target file exists if applicable."""
+#     target = command[-1]
+#     if ("." in target or "/" in target) and not os.path.isfile(target):
+#         print(f"\n  File not found: {target}\n")
+#         sys.exit(1)
 
 
 def execute_command(command: list[str]) -> subprocess.CompletedProcess:
     """Execute command and return result."""
     try:
-        return subprocess.run(command, capture_output=True, text=True)
+        return subprocess.run(command, capture_output=True, text=True, cwd=os.getcwd())
     except FileNotFoundError:
         print(f"\n  Command not found: {command[0]}\n")
         sys.exit(1)
@@ -175,12 +176,20 @@ def debug_with_claude(error: str) -> None:
 def run():
     """Main function to run the CLI debugger."""
     command = get_command()
-    validate_command(command)
+    # validate_command(command)
     result = execute_command(command)
 
     if result.returncode == 0:
         print("\n   No errors - clean run\n")
         return
 
-    error = result.stderr
-    debug_with_claude(error)
+    failure_context = FailureContext(
+        command=command,
+        cwd=os.getcwd(),
+        returncode = result.returncode,
+        stdout=result.stdout,
+        stderr=result.stderr
+    )
+
+    print(failure_context.to_prompt)
+    debug_with_claude(failure_context.to_prompt())
