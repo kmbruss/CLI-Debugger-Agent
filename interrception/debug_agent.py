@@ -39,7 +39,7 @@ class DebugResults:
     answer: str
     turns: int
     stop_reason: str
-    # trajectory: list
+    trajectory: list
 
 
 # ============================================================================
@@ -76,6 +76,7 @@ def handle_tool_results(message) -> list[dict]:
 def debug(prompt: str, client, model: str = "claude-haiku-4-5", max_attempts: int = 5) -> DebugResults:
     """Run the agent loop against a failure prompt. No printing -> returns a DebugResult."""
     messages = [{"role": "user", "content": prompt}]
+    trajectory = []
 
     for attempt in range(1, max_attempts + 1):
         message = client.messages.create(
@@ -86,10 +87,16 @@ def debug(prompt: str, client, model: str = "claude-haiku-4-5", max_attempts: in
             system=SYSTEM_PROMPT
         )
 
+        trajectory.append({
+            "attempt": attempt,
+            "stop_reason": message.stop_reason,
+            "content": message.content
+        })
+
         # Check if Claude needs to use tools
         if message.stop_reason != "tool_use":
-            answer = next(content.text for content in message.content if content.type == "text")
-            return DebugResults(answer=answer, turns=attempt, stop_reason="answered")
+            answer = next((content.text for content in message.content if content.type == "text"), "")
+            return DebugResults(answer=answer, turns=attempt, stop_reason="answered", trajectory=trajectory)
 
         # Process tool requests and add to conversation
         tool_results = handle_tool_results(message)
@@ -97,11 +104,24 @@ def debug(prompt: str, client, model: str = "claude-haiku-4-5", max_attempts: in
         messages.append({"role": "user", "content": tool_results})
     
     # Max attempts reached - get final response
-    final = client.messages.create(
+    final_attempt = client.messages.create(
         max_tokens=500,
         messages=messages,
         model=model,
         system=SYSTEM_PROMPT
     )
-    answer = next(content.text for content in final.content if content.type == "text")
-    return DebugResults(answer=answer, turns=max_attempts, stop_reason="max_attempts")
+
+    trajectory.append({
+            "attempt": max_attempts + 1,
+            "stop_reason": "max_attempts",
+            "content": final_attempt.content
+        })
+    
+    answer = next((content.text for content in final_attempt.content if content.type == "text"), "")
+
+    return DebugResults(
+        answer=answer, 
+        turns=max_attempts, 
+        stop_reason="max_attempts",
+        trajectory=trajectory
+    )
