@@ -53,7 +53,10 @@ def get_command() -> list[str]:
 def execute_command(command: list[str]) -> subprocess.CompletedProcess:
     """Execute command and return result."""
     try:
-        return subprocess.run(command, capture_output=True, text=True, cwd=os.getcwd())
+        return subprocess.run(command, capture_output=True, text=True, cwd=os.getcwd(), timeout=10)
+    except subprocess.TimeoutExpired:
+        print(f"\n '{' '.join(command)}' didn't finish in 10s - likely waiting on input, not a crash\n")
+        sys.exit(1)
     except FileNotFoundError:
         print(f"\n  Command not found: {command[0]}\n")
         sys.exit(1)
