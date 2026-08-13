@@ -1,10 +1,14 @@
 *.egg-info/
 __pycache__/
 *.pyc
-venv/
+venv312/
 .env
 scratch/
 .DS_Store
 .claude
 
 PySnooper/
+click/
+arrow/
+
+eval_cases/repos/
