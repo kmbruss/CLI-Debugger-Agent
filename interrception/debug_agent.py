@@ -60,6 +60,8 @@ class DebugResults:
     turns: int
     stop_reason: str
     trajectory: list
+    input_tokens: int
+    output_tokens: int
 
 
 # ============================================================================
@@ -130,6 +132,8 @@ def debug(prompt: str, client, model: str = "claude-haiku-4-5", max_attempts: in
     """Run the agent loop against a failure prompt. No printing -> returns a DebugResult."""
     messages = [{"role": "user", "content": prompt}]
     trajectory = []
+    total_input_tokens = 0
+    total_output_tokens = 0
 
     tools = TOOLS if use_tools else []
 
@@ -142,6 +146,10 @@ def debug(prompt: str, client, model: str = "claude-haiku-4-5", max_attempts: in
             system=SYSTEM_PROMPT
         )
 
+        # Track token usage
+        total_input_tokens += message.usage.input_tokens
+        total_output_tokens += message.usage.output_tokens
+
         trajectory.append({
             "attempt": attempt,
             "stop_reason": message.stop_reason,
@@ -151,13 +159,20 @@ def debug(prompt: str, client, model: str = "claude-haiku-4-5", max_attempts: in
         # Check if Claude needs to use tools
         if message.stop_reason != "tool_use":
             answer = next((content.text for content in message.content if content.type == "text"), "")
-            return DebugResults(answer=answer, turns=attempt, stop_reason="answered", trajectory=trajectory)
+            return DebugResults(
+                answer=answer,
+                turns=attempt,
+                stop_reason="answered",
+                trajectory=trajectory,
+                input_tokens=total_input_tokens,
+                output_tokens=total_output_tokens
+            )
 
         # Process tool requests and add to conversation
         tool_results = handle_tool_results(message)
         messages.append({"role": "assistant", "content": message.content})
         messages.append({"role": "user", "content": tool_results})
-    
+
     # Max attempts reached - get final response
     final_attempt = client.messages.create(
         max_tokens=500,
@@ -166,17 +181,23 @@ def debug(prompt: str, client, model: str = "claude-haiku-4-5", max_attempts: in
         system=SYSTEM_PROMPT
     )
 
+    # Track final token usage
+    total_input_tokens += final_attempt.usage.input_tokens
+    total_output_tokens += final_attempt.usage.output_tokens
+
     trajectory.append({
             "attempt": max_attempts + 1,
             "stop_reason": "max_attempts",
             "content": final_attempt.content
         })
-    
+
     answer = next((content.text for content in final_attempt.content if content.type == "text"), "")
 
     return DebugResults(
-        answer=answer, 
-        turns=max_attempts, 
+        answer=answer,
+        turns=max_attempts,
         stop_reason="max_attempts",
-        trajectory=trajectory
+        trajectory=trajectory,
+        input_tokens=total_input_tokens,
+        output_tokens=total_output_tokens
     )
