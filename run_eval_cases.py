@@ -1,5 +1,4 @@
 import os
-import sys
 import subprocess
 
 from interrception.debug_agent import debug
