@@ -1,5 +1,7 @@
 from dataclasses import dataclass
 
+import os
+
 # ============================================================================
 # Setup
 # ============================================================================
@@ -28,8 +30,26 @@ TOOLS = [
             },
             "required": ["path"]
         }
+    },
+    {
+        "name": "list_directory",
+        "description": (
+            "List the files and subdirectories at a path. Directory names end with '/'. "
+            "Use this when you need to discover what files exist before reading them, or "
+            "to check whether a name refers to a module file or a package directory."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "path": {
+                    "type": "string",
+                    "description": "The directory to list. Defaults to current directory."
+                }
+            }
+        }
     }
 ]
+
 
 # ============================================================================
 # Results of a successful debug
@@ -45,6 +65,16 @@ class DebugResults:
 # ============================================================================
 # Functions
 # ============================================================================
+def choose_tool(block) -> str:
+    tool = TOOLS_AVAILABLE.get(block.name)
+    if tool is None:
+        return f"Tool unknown '{block.name}'"   
+    try:
+        return tool(**block.input)
+    except Exception as e:
+        return f"Error running {block.name}: {type(e).__name__}: {e}"
+
+
 def read_file(path: str) -> str:
     """Read file contents and return as string with error handling."""
     try:
@@ -54,18 +84,41 @@ def read_file(path: str) -> str:
         return f"\n Error: File not found at {path}\n"
     except Exception as e:
         return f"\n Error reading {path}: {e}\n"
+    
+IGNORE = {".git", "__pycache__", ".pytest_cache", ".venv", "venv", "node_modules", ".mypy_cache", ".DS_Store"}
+def list_directory(path: str = ".") -> str:
+    try:
+        files = sorted(os.listdir(path))
+    except Exception as e:
+        return f"error listing {path}: {e}"
+
+    file_list = []
+    for f in files:
+        if f in IGNORE:
+            continue
+        full_path = os.path.join(path, f)
+        file_list.append(f"{f}/" if os.path.isdir(full_path) else f)
+
+    return "\n".join(file_list) if file_list else "(empty)"
+
+
+TOOLS_AVAILABLE = {
+    "read_file": read_file,
+    "list_directory": list_directory,
+    # "grep": grep,
+}
 
 
 def handle_tool_results(message) -> list[dict]:
     """Process tool use requests and return results."""
     tool_results = []
 
-    for content in message.content:
-        if content.type == "tool_use":
+    for block in message.content:
+        if block.type == "tool_use":
             tool_results.append({
                 "type": "tool_result",
-                "tool_use_id": content.id,
-                "content": read_file(content.input["path"])
+                "tool_use_id": block.id,
+                "content": choose_tool(block)
             })
     return tool_results
 
