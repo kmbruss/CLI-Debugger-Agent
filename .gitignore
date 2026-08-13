@@ -6,3 +6,5 @@ venv/
 scratch/
 .DS_Store
 .claude
+
+PySnooper/
