@@ -11,4 +11,6 @@ PySnooper/
 click/
 arrow/
 
-eval_cases/repos/
+eval_cases/
+repos/
+
