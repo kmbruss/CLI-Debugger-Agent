@@ -111,16 +111,29 @@ TOOLS_AVAILABLE = {
 }
 
 
-def handle_tool_results(message) -> list[dict]:
+def handle_tool_results(message, seen_paths:set) -> list[dict]:
     """Process tool use requests and return results."""
     tool_results = []
 
     for block in message.content:
         if block.type == "tool_use":
+            if block.name == "read_file":
+                path = os.path.abspath(block.input["path"])
+                if path in seen_paths:
+                    content = (
+                        f"[Already read {path} earlier in this conversation. "
+                        f"Its contents are above — scroll up rather than re-reading.]"
+                    )
+                else:
+                    seen_paths.add(path)
+                    content = choose_tool(block)
+            else:
+                content = choose_tool(block)
+
             tool_results.append({
                 "type": "tool_result",
                 "tool_use_id": block.id,
-                "content": choose_tool(block)
+                "content": content
             })
     return tool_results
 
@@ -132,6 +145,7 @@ def debug(prompt: str, client, model: str = "claude-haiku-4-5", max_attempts: in
     """Run the agent loop against a failure prompt. No printing -> returns a DebugResult."""
     messages = [{"role": "user", "content": prompt}]
     trajectory = []
+    seen_paths = set()
     total_input_tokens = 0
     total_output_tokens = 0
 
@@ -169,7 +183,7 @@ def debug(prompt: str, client, model: str = "claude-haiku-4-5", max_attempts: in
             )
 
         # Process tool requests and add to conversation
-        tool_results = handle_tool_results(message)
+        tool_results = handle_tool_results(message, seen_paths)
         messages.append({"role": "assistant", "content": message.content})
         messages.append({"role": "user", "content": tool_results})
 
