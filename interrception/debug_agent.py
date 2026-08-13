@@ -73,17 +73,19 @@ def handle_tool_results(message) -> list[dict]:
 # ============================================================================
 # agent loop
 # ============================================================================
-def debug(prompt: str, client, model: str = "claude-haiku-4-5", max_attempts: int = 5) -> DebugResults:
+def debug(prompt: str, client, model: str = "claude-haiku-4-5", max_attempts: int = 5, use_tools: bool = True) -> DebugResults:
     """Run the agent loop against a failure prompt. No printing -> returns a DebugResult."""
     messages = [{"role": "user", "content": prompt}]
     trajectory = []
+
+    tools = TOOLS if use_tools else []
 
     for attempt in range(1, max_attempts + 1):
         message = client.messages.create(
             max_tokens=1000,
             messages=messages,
             model=model,
-            tools=TOOLS,
+            tools=tools,
             system=SYSTEM_PROMPT
         )
 
