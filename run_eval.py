@@ -22,8 +22,14 @@ def run_cases(cases_dir: str) -> list[dict]:
     results = []
     for case_folder in sorted(os.listdir(cases_dir)):
 
-        case_path = "eval_cases/case_1_import_error/"#os.path.join(cases_dir, case_folder)
-        # main_file = os.path.join(case_path, "main.py")
+        case_path = os.path.abspath(os.path.join(cases_dir, case_folder))
+        main_file = os.path.join(case_path, "main.py")
+
+        if not os.path.isdir(case_path):
+            continue
+        if not os.path.isfile(main_file):
+            print(f"skipping {case_folder}: no main.py")
+            continue
 
         result = subprocess.run(
             ["python", "main.py"], 
@@ -45,7 +51,7 @@ def run_cases(cases_dir: str) -> list[dict]:
         original = os.getcwd()
         try:
             os.chdir(case_path)
-            debug_results = debug(prompt=failure_context.to_prompt(), client=client)
+            debug_results = debug(prompt=failure_context.to_prompt(), client=client, use_tools=False)
         finally:
             os.chdir(original)
 
@@ -65,7 +71,7 @@ def run():
         print(f"\n--- {r['id']} ---")
         print(f"    turns: {r['turns']}  stop_reason: {r['stop_reason']}")
         print(f"    files read: {r['trajectory']}")
-        print(f"    {r['answer'][:400]}")
+        print(f"    {r['answer'][:200]}")
 
 
 
