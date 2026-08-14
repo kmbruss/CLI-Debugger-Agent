@@ -1,55 +1,9 @@
 from dataclasses import dataclass
 
+from interrception.tools import TOOLS
+from interrception.tools import SYSTEM_PROMPT
+
 import os
-
-# ============================================================================
-# Setup
-# ============================================================================
-SYSTEM_PROMPT = (
-    "You are a CLI debugging assistant. "
-    "Respond in plain text only, not markdown "
-    "Give simple, readable, yet informative output"
-    "This is a one-shot tool — the user cannot respond or answer follow-up questions. "
-    "Never ask the user a question or ask them to provide more information. "
-    "If something is ambiguous, state your best-guess interpretation explicitly and proceed with it, "
-    "or list the most likely possibilities as options rather than asking which one applies."
-)
-
-
-TOOLS = [
-    {
-        "name": "read_file",
-        "description": "Read the full contents of a file at the given path. Use this when you need to see code that isn't in the error message, such as a file mentioned in the traceback or one it imports from.",
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "path": {
-                    "type": "string",
-                    "description": "The path to the file to read."
-                }
-            },
-            "required": ["path"]
-        }
-    },
-    {
-        "name": "list_directory",
-        "description": (
-            "List the files and subdirectories at a path. Directory names end with '/'. "
-            "Use this when you need to discover what files exist before reading them, or "
-            "to check whether a name refers to a module file or a package directory."
-        ),
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "path": {
-                    "type": "string",
-                    "description": "The directory to list. Defaults to current directory."
-                }
-            }
-        }
-    }
-]
-
 
 # ============================================================================
 # Results of a successful debug
@@ -72,6 +26,7 @@ def choose_tool(block) -> str:
     if tool is None:
         return f"Tool unknown '{block.name}'"   
     try:
+        # Unload block (path (and pattern for grep) into chosen tool)
         return tool(**block.input)
     except Exception as e:
         return f"Error running {block.name}: {type(e).__name__}: {e}"
@@ -86,6 +41,7 @@ def read_file(path: str) -> str:
         return f"\n Error: File not found at {path}\n"
     except Exception as e:
         return f"\n Error reading {path}: {e}\n"
+
     
 IGNORE = {".git", "__pycache__", ".pytest_cache", ".venv", "venv", "node_modules", ".mypy_cache", ".DS_Store"}
 def list_directory(path: str = ".") -> str:
@@ -104,10 +60,14 @@ def list_directory(path: str = ".") -> str:
     return "\n".join(file_list) if file_list else "(empty)"
 
 
+def grep():
+    None
+
+
 TOOLS_AVAILABLE = {
     "read_file": read_file,
     "list_directory": list_directory,
-    # "grep": grep,
+    "grep": grep,
 }
 
 
