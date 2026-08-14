@@ -1,4 +1,4 @@
-from DebugResults import DebugResults
+from interrception.DebugResults import DebugResults
 
 from interrception.tools import TOOLS
 from interrception.tools import SYSTEM_PROMPT
