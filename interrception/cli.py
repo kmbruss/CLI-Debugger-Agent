@@ -6,7 +6,7 @@ import subprocess
 import anthropic
 from dotenv import load_dotenv
 
-from interrception.failure_context import FailureContext
+from interrception.FailureContext import FailureContext
 from interrception.debug_agent import debug
 
 # ============================================================================

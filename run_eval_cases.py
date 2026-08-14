@@ -2,7 +2,7 @@ import os
 import subprocess
 
 from interrception.debug_agent import debug
-from interrception.failure_context import FailureContext
+from interrception.FailureContext import FailureContext
 
 from interrception.cli import client
 

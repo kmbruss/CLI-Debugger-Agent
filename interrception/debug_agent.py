@@ -1,22 +1,9 @@
-from dataclasses import dataclass
+from DebugResults import DebugResults
 
 from interrception.tools import TOOLS
 from interrception.tools import SYSTEM_PROMPT
 
 import os
-
-# ============================================================================
-# Results of a successful debug
-# ============================================================================
-@dataclass
-class DebugResults:
-    answer: str
-    turns: int
-    stop_reason: str
-    trajectory: list
-    input_tokens: int
-    output_tokens: int
-
 
 # ============================================================================
 # Functions

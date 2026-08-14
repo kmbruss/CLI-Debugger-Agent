@@ -1,5 +1,8 @@
 from dataclasses import dataclass
 
+# ============================================================================
+# Context of a bug
+# ============================================================================
 @dataclass
 class FailureContext:
     command: list[str]
