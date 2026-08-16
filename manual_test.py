@@ -1,5 +1,4 @@
-# Import the debugging tools and failure context handler
-from interrception.failure_context import FailureContext
+from interrception.FailureContext import FailureContext
 from interrception.debug_agent import debug
 from interrception.cli import client
 
