@@ -51,7 +51,8 @@ results = []
 def save_results(results, use_tools):
     os.makedirs("results", exist_ok=True)
     arm = "with_tools" if use_tools else "no_tools"
-    path = f"results/{arm}.json"
+    # path = f"results/{arm}.json"
+    path = "results/with_tools_grep_fullread.json"
 
     with open(path, "w") as f:
          json.dump(results, f, indent=2)
@@ -126,8 +127,8 @@ for CASE in CASES:
             "stop_reason": debug_result.stop_reason,
             "input_tokens": debug_result.input_tokens,
             "output_tokens": debug_result.output_tokens,
-            "files_read": [
-                block.input.get("path")
+            "tool_calls": [
+                {"tool": block.name, "input": block.input}
                 for turn in debug_result.trajectory
                     for block in turn["content"]
                         if block.type == "tool_use"

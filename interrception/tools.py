@@ -12,13 +12,24 @@ SYSTEM_PROMPT = (
 TOOLS = [
     {
         "name": "read_file",
-        "description": "Read the full contents of a file at the given path. Use this when you need to see code that isn't in the error message, such as a file mentioned in the traceback or one it imports from.",
+        "description": 
+                "read a file's contents, optionally a line range; "
+                "when you have a line number from grep, read roughly 100 lines around it rather than the whole file; "
+                "only read a whole file when you need its overall structure.",
         "input_schema": {
             "type": "object",
             "properties": {
                 "path": {
                     "type": "string",
                     "description": "The path to the file to read."
+                },
+                "start_line": {
+                    "type": "integer",
+                    "description": "First line to read (1-indexed). Omit to read from the start."
+                },
+                "end_line": {
+                    "type": "integer",
+                    "description": "Last line to read, inclusive. Omit to read to the end."
                 }
             },
             "required": ["path"]

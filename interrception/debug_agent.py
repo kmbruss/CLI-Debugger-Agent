@@ -19,15 +19,30 @@ def choose_tool(block) -> str:
         return f"Error running {block.name}: {type(e).__name__}: {e}"
 
 
-def read_file(path: str) -> str:
+def read_file(path: str, start_line: int = None, end_line: int = None) -> str:
     """Read file contents and return as string with error handling."""
     try:
-        with open(path, "r") as file:
-            return file.read()
+        with open(path, "r", errors="ignore") as file:
+            lines = file.readlines()
+
+            begin = (start_line - 1) if start_line else 0
+            end = end_line if end_line else len(lines)
+
+            sliced = lines[begin:end]
+            numbered = [
+                f"{i}: {line.rstrip()}"
+                for i, line in enumerate(sliced, start=begin + 1)
+            ]
+
+            body = "\n".join(numbered)
+            return f"Showing lines {begin + 1}-{end} of {len(lines)}:\n{body}"
+        
     except FileNotFoundError:
         return f"\n Error: File not found at {path}\n"
     except Exception as e:
         return f"\n Error reading {path}: {e}\n"
+
+    
 
     
 IGNORE = {".git", "__pycache__", ".pytest_cache", ".venv", "venv", "node_modules", ".mypy_cache", ".DS_Store"}
@@ -47,8 +62,29 @@ def list_directory(path: str = ".") -> str:
     return "\n".join(file_list) if file_list else "(empty)"
 
 
-def grep():
-    None
+def grep(pattern: str, path: str = ".") -> str:
+    matches = []
+    for dirpath, dirnames, filenames in os.walk(path):
+        dirnames[:] = [
+            d for d in dirnames 
+            if d not in IGNORE
+            and not d.startswith(".")
+            and not d.startswith("venv")
+        ]
+        for filename in filenames:
+            filepath = os.path.join(dirpath, filename)
+            try:
+                with open(filepath, "r", errors="ignore") as contents:
+                    for line_no, line in enumerate(contents, 1):
+                        if pattern in line:
+                            matches.append(f"{filepath}:{line_no}: {line.strip()}")
+            except Exception:
+                continue
+    if not matches:
+        return f"No matches for '{pattern}' in {path}"
+    if (len(matches) > 100):
+        return "\n".join(matches[:100]) + f"\n... ({len(matches)} total matches, showing first 100)"
+    return "\n".join(matches)
 
 
 TOOLS_AVAILABLE = {
@@ -58,7 +94,7 @@ TOOLS_AVAILABLE = {
 }
 
 
-def handle_tool_results(message, seen_paths:set) -> list[dict]:
+def handle_tool_results(message, seen_reads:set) -> list[dict]:
     """Process tool use requests and return results."""
     tool_results = []
 
@@ -66,13 +102,14 @@ def handle_tool_results(message, seen_paths:set) -> list[dict]:
         if block.type == "tool_use":
             if block.name == "read_file":
                 path = os.path.abspath(block.input["path"])
-                if path in seen_paths:
+                key = (path, block.input.get("start_line"), block.input.get("end_line"))
+                if key in seen_reads:
                     content = (
-                        f"[Already read {path} earlier in this conversation. "
-                        f"Its contents are above — scroll up rather than re-reading.]"
+                        f"[Already read the exact range of {path} earlier in this conversation. "
+                        f"Its contents are above, scroll up rather than re-reading.]"
                     )
                 else:
-                    seen_paths.add(path)
+                    seen_reads.add(key)
                     content = choose_tool(block)
             else:
                 content = choose_tool(block)
