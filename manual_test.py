@@ -67,9 +67,11 @@ def git(repo, *args, input=None):
     )
 
 
-# iterate through cases 
-for CASE in CASES:
-    print(f" ----- {CASE["id"]} -----")
+# iterate through cases
+for idx, CASE in enumerate(CASES, 1):
+    print(f"\n{'='*80}")
+    print(f"CASE {idx}/{len(CASES)}: {CASE['id']}")
+    print(f"{'='*80}")
     original = os.getcwd()
 
     repo = os.path.abspath(CASE["repo"])
@@ -88,16 +90,17 @@ for CASE in CASES:
         bad_repo_result = git(repo, "apply", "-R", "-", input=diff)
 
         if bad_repo_result.returncode != 0:
-            print(f"REVERT FAILED for {CASE['id']}: {bad_repo_result.stderr.strip()}")
+            print(f"\n⚠️  SKIPPED: Revert failed")
+            print(f"   Error: {bad_repo_result.stderr.strip()}")
             continue
 
         error_result = subprocess.run(
-            cmd, capture_output=True, 
+            cmd, capture_output=True,
             text=True, cwd=repo
         )
 
         if error_result.returncode == 0:
-            print(f"{CASE['id']} exited code 0")
+            print(f"\n⚠️  SKIPPED: Command succeeded (expected failure)")
             continue
 
         failure_context = FailureContext(
@@ -112,13 +115,51 @@ for CASE in CASES:
             client, use_tools=use_tools
         )
 
-        print(f"=== use_tools={use_tools} | turns={debug_result.turns} | tokens: {debug_result.input_tokens} in / {debug_result.output_tokens} out ===")
-        print(debug_result.answer)
+        # Format output nicely
+        print(f"\n{'='*80}")
+        print(f"METRICS:")
+        print(f"  Turns:         {debug_result.turns}")
+        print(f"  Input tokens:  {debug_result.input_tokens:,}")
+        print(f"  Output tokens: {debug_result.output_tokens:,}")
+        print(f"  Total tokens:  {debug_result.input_tokens + debug_result.output_tokens:,}")
+        print(f"  Stop reason:   {debug_result.stop_reason}")
 
-        for message in debug_result.trajectory:
-                for block in message["content"]:
-                    if block.type == "tool_use":
-                        print(f"{block.name} ({block.input})")
+        # Tool calls
+        tool_calls = [
+            block for message in debug_result.trajectory
+            for block in message["content"]
+            if block.type == "tool_use"
+        ]
+
+        if tool_calls:
+            print(f"\nTOOL CALLS ({len(tool_calls)} total):")
+            for i, block in enumerate(tool_calls, 1):
+                if block.name == "read_file":
+                    path = block.input.get("path", "").replace(repo + "/", "")
+                    start = block.input.get("start_line")
+                    end = block.input.get("end_line")
+                    if start and end:
+                        print(f"  {i}. read_file: {path} (lines {start}-{end})")
+                    else:
+                        print(f"  {i}. read_file: {path}")
+                elif block.name == "grep":
+                    pattern = block.input.get("pattern", "")
+                    print(f"  {i}. grep: '{pattern}'")
+                elif block.name == "list_directory":
+                    path = block.input.get("path", ".").replace(repo + "/", "")
+                    print(f"  {i}. list_directory: {path}")
+                else:
+                    print(f"  {i}. {block.name}: {block.input}")
+
+        print(f"\nANSWER:")
+        # Truncate long answers for readability
+        answer_lines = debug_result.answer.split('\n')
+        if len(answer_lines) > 30:
+            print('\n'.join(answer_lines[:30]))
+            print(f"\n  ... ({len(answer_lines) - 30} more lines)")
+        else:
+            print(debug_result.answer)
+        print(f"{'='*80}\n")
 
         results.append({
             "case_id": CASE["id"],
@@ -140,6 +181,24 @@ for CASE in CASES:
         git(repo, "checkout", "-q", "--", ".")
         if git(repo, "checkout", "-q", "master").returncode != 0:
              git(repo, "checkout", "-q", "main")
+
+# Print summary table
+if results:
+    print("\n" + "="*100)
+    print("SUMMARY")
+    print("="*100)
+    print(f"{'Case ID':<30} {'Turns':<8} {'Input':<12} {'Output':<12} {'Total':<12} {'Stop':<15}")
+    print("-"*100)
+    for r in results:
+        total = r['input_tokens'] + r['output_tokens']
+        print(f"{r['case_id']:<30} {r['turns']:<8} {r['input_tokens']:<12,} {r['output_tokens']:<12,} {total:<12,} {r['stop_reason']:<15}")
+
+    total_input = sum(r['input_tokens'] for r in results)
+    total_output = sum(r['output_tokens'] for r in results)
+    total_all = total_input + total_output
+    print("-"*100)
+    print(f"{'TOTAL':<30} {'':<8} {total_input:<12,} {total_output:<12,} {total_all:<12,}")
+    print("="*100 + "\n")
 
 #  Save results if requested
 if should_save:

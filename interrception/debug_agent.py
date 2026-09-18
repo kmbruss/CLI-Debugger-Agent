@@ -21,12 +21,19 @@ def choose_tool(block) -> str:
 
 def read_file(path: str, start_line: int = None, end_line: int = None) -> str:
     """Read file contents and return as string with error handling."""
+    MAX_LINES = 200  # Limit output to reduce token usage
+
     try:
         with open(path, "r", errors="ignore") as file:
             lines = file.readlines()
 
             begin = (start_line - 1) if start_line else 0
             end = end_line if end_line else len(lines)
+
+            # Enforce max line limit
+            requested_lines = end - begin
+            if requested_lines > MAX_LINES:
+                end = begin + MAX_LINES
 
             sliced = lines[begin:end]
             numbered = [
@@ -35,8 +42,14 @@ def read_file(path: str, start_line: int = None, end_line: int = None) -> str:
             ]
 
             body = "\n".join(numbered)
-            return f"Showing lines {begin + 1}-{end} of {len(lines)}:\n{body}"
-        
+            result = f"Showing lines {begin + 1}-{end} of {len(lines)}:\n{body}"
+
+            # Truncate if still too long
+            if len(result) > 8000:
+                result = result[:8000] + f"\n... (truncated, total file has {len(lines)} lines)"
+
+            return result
+
     except FileNotFoundError:
         return f"\n Error: File not found at {path}\n"
     except Exception as e:
@@ -47,6 +60,8 @@ def read_file(path: str, start_line: int = None, end_line: int = None) -> str:
     
 IGNORE = {".git", "__pycache__", ".pytest_cache", ".venv", "venv", "node_modules", ".mypy_cache", ".DS_Store"}
 def list_directory(path: str = ".") -> str:
+    MAX_FILES = 100  # Limit directory listings
+
     try:
         files = sorted(os.listdir(path))
     except Exception as e:
@@ -59,14 +74,22 @@ def list_directory(path: str = ".") -> str:
         full_path = os.path.join(path, f)
         file_list.append(f"{f}/" if os.path.isdir(full_path) else f)
 
-    return "\n".join(file_list) if file_list else "(empty)"
+        if len(file_list) >= MAX_FILES:
+            break
+
+    result = "\n".join(file_list) if file_list else "(empty)"
+    if len(files) > MAX_FILES:
+        result += f"\n... ({len(files)} total files, showing first {MAX_FILES})"
+
+    return result
 
 
 def grep(pattern: str, path: str = ".") -> str:
+    MAX_MATCHES = 25  # Reduced from 100 to save tokens
     matches = []
     for dirpath, dirnames, filenames in os.walk(path):
         dirnames[:] = [
-            d for d in dirnames 
+            d for d in dirnames
             if d not in IGNORE
             and not d.startswith(".")
             and not d.startswith("venv")
@@ -78,12 +101,21 @@ def grep(pattern: str, path: str = ".") -> str:
                     for line_no, line in enumerate(contents, 1):
                         if pattern in line:
                             matches.append(f"{filepath}:{line_no}: {line.strip()}")
+                            # Early exit if we hit the limit
+                            if len(matches) >= MAX_MATCHES * 2:
+                                break
             except Exception:
                 continue
+            # Early exit at file level too
+            if len(matches) >= MAX_MATCHES * 2:
+                break
+        if len(matches) >= MAX_MATCHES * 2:
+            break
+
     if not matches:
         return f"No matches for '{pattern}' in {path}"
-    if (len(matches) > 100):
-        return "\n".join(matches[:100]) + f"\n... ({len(matches)} total matches, showing first 100)"
+    if len(matches) > MAX_MATCHES:
+        return "\n".join(matches[:MAX_MATCHES]) + f"\n... ({len(matches)} total matches, showing first {MAX_MATCHES})"
     return "\n".join(matches)
 
 
@@ -136,12 +168,37 @@ def debug(prompt: str, client, model: str = "claude-haiku-4-5", max_attempts: in
     tools = TOOLS if use_tools else []
 
     for attempt in range(1, max_attempts + 1):
+        # Remove all old cache_control markers from messages to avoid exceeding 4-block limit
+        for msg in messages:
+            content = msg.get("content")
+            if isinstance(content, list):
+                for item in content:
+                    if isinstance(item, dict) and "cache_control" in item:
+                        del item["cache_control"]
+
+        # Add cache_control only to the last user message for conversation history caching
+        # This keeps us within the 4-block limit: 1 for system + 1 for last message
+        if len(messages) > 0 and messages[-1]["role"] == "user":
+            content = messages[-1]["content"]
+            if isinstance(content, str):
+                messages[-1]["content"] = [
+                    {"type": "text", "text": content, "cache_control": {"type": "ephemeral"}}
+                ]
+            elif isinstance(content, list) and len(content) > 0:
+                content[-1]["cache_control"] = {"type": "ephemeral"}
+
         message = client.messages.create(
             max_tokens=1000,
             messages=messages,
             model=model,
             tools=tools,
-            system=SYSTEM_PROMPT
+            system=[
+                {
+                    "type": "text",
+                    "text": SYSTEM_PROMPT,
+                    "cache_control": {"type": "ephemeral"}
+                }
+            ]
         )
 
         # Track token usage
@@ -172,11 +229,35 @@ def debug(prompt: str, client, model: str = "claude-haiku-4-5", max_attempts: in
         messages.append({"role": "user", "content": tool_results})
 
     # Max attempts reached - get final response
+    # Remove all old cache_control markers
+    for msg in messages:
+        content = msg.get("content")
+        if isinstance(content, list):
+            for item in content:
+                if isinstance(item, dict) and "cache_control" in item:
+                    del item["cache_control"]
+
+    # Add cache_control to last message
+    if len(messages) > 0 and messages[-1]["role"] == "user":
+        content = messages[-1]["content"]
+        if isinstance(content, str):
+            messages[-1]["content"] = [
+                {"type": "text", "text": content, "cache_control": {"type": "ephemeral"}}
+            ]
+        elif isinstance(content, list) and len(content) > 0:
+            content[-1]["cache_control"] = {"type": "ephemeral"}
+
     final_attempt = client.messages.create(
         max_tokens=500,
         messages=messages,
         model=model,
-        system=SYSTEM_PROMPT
+        system=[
+            {
+                "type": "text",
+                "text": SYSTEM_PROMPT,
+                "cache_control": {"type": "ephemeral"}
+            }
+        ]
     )
 
     # Track final token usage

@@ -12,10 +12,10 @@ SYSTEM_PROMPT = (
 TOOLS = [
     {
         "name": "read_file",
-        "description": 
-                "read a file's contents, optionally a line range; "
-                "when you have a line number from grep, read roughly 100 lines around it rather than the whole file; "
-                "only read a whole file when you need its overall structure.",
+        "description":
+                "read a file's contents, optionally a line range (max 200 lines per call); "
+                "ALWAYS specify a line range when you have a line number from grep - read ~50-100 lines around it; "
+                "avoid reading entire files unless absolutely necessary for overall structure.",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -55,18 +55,18 @@ TOOLS = [
     {
         "name": "grep",
         "description": (
-            "Search file contents for a text pattern across a directory tree. Returns "
-            "matching lines as 'path:line: content'. Use this FIRST when you need to "
+            "Search file contents for a text pattern across a directory tree (returns max 25 matches). "
+            "Returns matching lines as 'path:line: content'. Use this FIRST when you need to "
             "find where something is defined (a class, function, or variable) and "
-            "you don't already know which file it's in. Prefer this over guessing "
-            "file paths with read_file."
+            "you don't already know which file it's in. Use specific patterns to avoid too many matches. "
+            "Prefer this over guessing file paths with read_file."
         ),
         "input_schema": {
             "type": "object",
             "properties": {
                 "pattern": {
                     "type": "string",
-                    "description": "Text to search for, e.g. 'class OutputCapturer' or 'def _format_timeframe'."
+                    "description": "Text to search for, e.g. 'class OutputCapturer' or 'def _format_timeframe'. Be specific."
                 },
                 "path": {
                     "type": "string",
