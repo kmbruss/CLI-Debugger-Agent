@@ -228,7 +228,19 @@ def debug(prompt: str, client, model: str = "claude-haiku-4-5", max_attempts: in
         messages.append({"role": "assistant", "content": message.content})
         messages.append({"role": "user", "content": tool_results})
 
-    # Max attempts reached - get final response
+    # Max attempts reached - prompt for final response
+    # Add a message asking for the final diagnosis
+    messages.append({
+        "role": "user",
+        "content": (
+            "Investigation limit reached. Give your final diagnosis NOW in 3-6 sentences:\n"
+            "PROBLEM: What's broken\n"
+            "LOCATION: file:line\n"
+            "FIX: What to change\n"
+            "Be direct and concise. No tool requests allowed."
+        )
+    })
+
     # Remove all old cache_control markers
     for msg in messages:
         content = msg.get("content")
@@ -248,9 +260,10 @@ def debug(prompt: str, client, model: str = "claude-haiku-4-5", max_attempts: in
             content[-1]["cache_control"] = {"type": "ephemeral"}
 
     final_attempt = client.messages.create(
-        max_tokens=500,
+        max_tokens=1000,  # Increased for detailed final answer
         messages=messages,
         model=model,
+        tools=[],  # Explicitly disable tools for final response
         system=[
             {
                 "type": "text",
